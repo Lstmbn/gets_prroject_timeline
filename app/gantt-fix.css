@@ -1,0 +1,57 @@
+.gantt-label {
+  min-height: 68px;
+  padding: 14px 18px;
+}
+
+.gantt-label.head {
+  font-size: 10px;
+}
+
+.gantt-label b {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.gantt-label small {
+  font-size: 11px;
+}
+
+.day {
+  width: 34px;
+  min-height: 68px;
+}
+
+.day.head {
+  height: 68px;
+  padding-top: 12px;
+}
+
+.day.head b {
+  font-size: 10px;
+}
+
+.day.head span {
+  font-size: 13px;
+}
+
+.day.weekend {
+  background: #f7f8f8;
+}
+
+.day.cell i {
+  top: 25px;
+  height: 18px;
+  background: #dfe8ec;
+  border: 1px solid #c8d7dd;
+  box-shadow: 0 1px 2px #0000000d;
+}
+
+.day.cell em {
+  background: #8faab5;
+  border-radius: inherit;
+  transition: width 0.2s ease;
+}
+
+.gantt-scroll {
+  max-height: 680px;
+}
