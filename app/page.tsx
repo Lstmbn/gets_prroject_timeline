@@ -30,10 +30,10 @@ export default function Home(){
   const [selected,setSelected]=useState(seed.projects.find(p=>p.name==="KEYLA TOAPEKONG")?.name||seed.projects[0]?.name||"");
   const [modal,setModal]=useState<"project"|"task"|null>(null);
   const [notice,setNotice]=useState("");
-  const [syncing,setSyncing]=useState(true);
 
-  useEffect(()=>{(async()=>{try{const r=await fetch("/api/sheets",{cache:"no-store"});if(!r.ok)throw new Error();const d=await r.json();if(Array.isArray(d.projects)&&d.projects.length)setProjects(d.projects);if(Array.isArray(d.tasks)&&d.tasks.length)setTasks(d.tasks)}catch{setNotice("Google Sheets belum tersambung — menampilkan data awal")}finally{setSyncing(false);setTimeout(()=>setNotice(""),3500)}})()},[]);
-  const persist=async(action:string,record:Project|Task)=>{try{const r=await fetch("/api/sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,record})});if(!r.ok)throw new Error(await r.text());setNotice("Tersimpan ke Google Sheets")}catch{setNotice("Gagal tersimpan. Periksa konfigurasi koneksi.")}setTimeout(()=>setNotice(""),3000)};
+  useEffect(()=>{(async()=>{try{const r=await fetch("/api/data",{cache:"no-store"}),d=await r.json();if(r.ok&&d.ok){if(d.projects?.length)setProjects(d.projects);if(d.tasks?.length)setTasks(d.tasks)}}catch{}})()},[]);
+  const save=async(payload:unknown)=>{const r=await fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Unable to save")};
+  const flash=(message:string)=>{setNotice(message);setTimeout(()=>setNotice(""),2600)};
   const uniqueNames=useMemo(()=>Array.from(new Set(projects.map(p=>p.name))),[projects]);
   const filtered=useMemo(()=>projects.filter(p=>(status==="All status"||p.status===status)&&(`${p.name} ${p.category} ${p.owner}`.toLowerCase().includes(query.toLowerCase()))),[projects,status,query]);
   const active=projects.filter(p=>p.status==="In Progress").length;
@@ -42,9 +42,9 @@ export default function Home(){
   const dueSoon=tasks.filter(t=>!t.done&&t.due&&new Date(t.due)>=new Date("2026-07-22")&&new Date(t.due)<=new Date("2026-07-29")).length;
   const title={dashboard:"Project overview",projects:"Project database",tasks:"Task control",timeline:"Project timeline"}[view];
 
-  function addProject(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const p={id:`p${Date.now()}`,name:String(f.get("name")||""),category:String(f.get("category")||"GENERAL"),status:String(f.get("status")||"Not started"),priority:String(f.get("priority")||"Medium"),start:String(f.get("start")||""),deadline:String(f.get("deadline")||""),progress:0,owner:String(f.get("owner")||""),team:"",pic:"",team1:"",team2:"",backup:"",notes:""} as Project;setProjects([p,...projects]);void persist("upsertProject",p);setModal(null)}
-  function addTask(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const t={id:`t${Date.now()}`,project:String(f.get("project")||""),name:String(f.get("name")||""),due:String(f.get("due")||""),done:false,completed:"",status:"Not started",priority:String(f.get("priority")||"Medium"),owner:String(f.get("owner")||""),notes:""} as Task;setTasks([t,...tasks]);void persist("upsertTask",t);setModal(null)}
-  function toggleTask(id:string){let changed:Task|undefined;const n=tasks.map(t=>{if(t.id!==id)return t;changed={...t,done:!t.done,status:!t.done?"Done":"In Progress"} as Task;return changed}) as Task[];setTasks(n);if(changed)void persist("upsertTask",changed)}
+  async function addProject(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const p={id:`p${Date.now()}`,name:String(f.get("name")||""),category:String(f.get("category")||"GENERAL"),status:String(f.get("status")||"Not started"),priority:String(f.get("priority")||"Medium"),start:String(f.get("start")||""),deadline:String(f.get("deadline")||""),progress:0,owner:String(f.get("owner")||""),team:"",pic:"",team1:"",team2:"",backup:"",notes:""} as Project;if(p.start&&p.deadline&&p.deadline<p.start){flash("Deadline cannot be earlier than start date");return}try{await save({action:"create",type:"project",record:p});setProjects([p,...projects]);setModal(null);flash("Project saved to Google Sheets")}catch(x){flash(x instanceof Error?x.message:"Unable to save project")}}
+  async function addTask(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const t={id:`t${Date.now()}`,project:String(f.get("project")||""),name:String(f.get("name")||""),due:String(f.get("due")||""),done:false,completed:"",status:"Not started",priority:String(f.get("priority")||"Medium"),owner:String(f.get("owner")||""),notes:""} as Task;try{await save({action:"create",type:"task",record:t});setTasks([t,...tasks]);setModal(null);flash("Task saved to Google Sheets")}catch(x){flash(x instanceof Error?x.message:"Unable to save task")}}
+  async function toggleTask(id:string){const current=tasks.find(t=>t.id===id);if(!current)return;const updated={...current,done:!current.done,status:!current.done?"Done":"In Progress"} as Task;setTasks(tasks.map(t=>t.id===id?updated:t) as Task[]);try{await save({action:"update",type:"task",record:updated});flash("Task status updated")}catch(x){setTasks(tasks);flash(x instanceof Error?x.message:"Unable to update task")}}
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -54,7 +54,7 @@ export default function Home(){
     </aside>
     <main>
       <header><h1>{title}</h1><div className="header-actions"><button className="icon-btn" aria-label="Notifications">○</button><button className="primary" onClick={()=>setModal(view==="tasks"?"task":"project")}>＋ {view==="tasks"?"New task":"Add project"}</button></div></header>
-      {(notice||syncing)&&<div className="toast">{syncing?"Menyinkronkan Google Sheets…":notice}</div>}
+      {notice&&<div className="toast">✓ {notice}</div>}
       {view==="dashboard"&&<Dashboard projects={projects} tasks={tasks} active={active} complete={complete} overdue={overdue} dueSoon={dueSoon} setView={setView}/>} 
       {view==="projects"&&<Projects projects={filtered} query={query} setQuery={setQuery} status={status} setStatus={setStatus}/>} 
       {view==="tasks"&&<Tasks tasks={tasks} query={query} setQuery={setQuery} toggle={toggleTask}/>} 
