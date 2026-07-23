@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const endpoint=process.env.GOOGLE_APPS_SCRIPT_URL;
-const token=process.env.SHEETS_API_TOKEN;
+const token = process.env.GOOGLE_APPS_SCRIPT_TOKEN;
 
 async function callScript(payload?:unknown){
   if(!endpoint||!token) return NextResponse.json({error:"Server integration is not configured"},{status:503});
